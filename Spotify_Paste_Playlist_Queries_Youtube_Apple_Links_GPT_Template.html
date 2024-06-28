@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Playlist 50 First Tracks</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.3.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+    <h1>Spotify Playlist 50 First Tracks</h1>
+    <p>This tool allows you to enter a Spotify playlist link and retrieves the first 50 tracks of that playlist. It displays each track's name and artist, and provides links to both Apple Music and YouTube for further listening or viewing.</p>
+
+    <form id="spotifyForm">
+        <label for="playlistLink">Enter Spotify Playlist Link:</label>
+        <input type="text" id="playlistLink" name="playlistLink" required><br>
+        <button type="button" onclick="getPlaylistTracks()">Get Playlist Tracks</button>
+    </form>
+    <button onclick="exportPDF()">Export to PDF</button>
+
+    <h2>Playlist Tracks</h2>
+    <table id="tracksTable">
+        <tr>
+            <th>Track Name</th>
+            <th>Artist(s)</th>
+            <th>Apple Music Link</th>
+            <th>YouTube Link</th>
+        </tr>
+    </table>
+
+    <script>
+        async function getPlaylistTracks() {
+            const clientId = 'your_spotify_client_id';  // Replace with your actual Spotify client ID
+            const clientSecret = 'your_spotify_client_secret'; // Replace with your actual Spotify client secret
+            const playlistLink = document.getElementById('playlistLink').value;
+            const playlistId = playlistLink.split('playlist/')[1].split('?')[0];
+
+            try {
+                const responseToken = await fetch('https://accounts.spotify.com/api/token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}`
+                });
+                const dataToken = await responseToken.json();
+                const accessToken = dataToken.access_token;
+                const headers = {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json',
+                };
+
+                const responseTracks = await fetch(`https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`, { headers });
+                const dataTracks = await responseTracks.json();
+
+                const table = document.getElementById('tracksTable');
+                table.innerHTML = '<tr><th>Track Name</th><th>Artist(s)</th><th>Apple Music Link</th><th>YouTube Link</th></tr>';
+
+                for (const item of dataTracks.items) {
+                    const track = item.track;
+                    const name = track.name;
+                    const artists = track.artists.map(artist => artist.name).join(', ');
+                    const mediaLinks = await getMediaLinks(name, artists);
+                    const row = `<tr><td>${name}</td><td>${artists}</td><td><a href="${mediaLinks.iTunes}" target="_blank">Apple Music</a></td><td><a href="${mediaLinks.YouTube}" target="_blank">YouTube</a></td></tr>`;
+                    table.innerHTML += row;
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+
+        function getMediaLinks(trackName, artistNames) {
+            const encodedName = encodeURIComponent(trackName + ' ' + artistNames).replace(/%20/g, '+');
+            return {
+                iTunes: `https://music.apple.com/us/search?term=${encodedName}`,
+                YouTube: `https://www.youtube.com/results?search_query=${encodeURIComponent(trackName + ' ' + artistNames)}`
+            };
+        }
+
+        function exportPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            doc.autoTable({ html: '#tracksTable' });
+            doc.output('dataurlnewwindow'); // Opens the PDF in a new tab
+        }
+    </script>
+</body>
+</html>
